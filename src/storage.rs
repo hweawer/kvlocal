@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::error::Error;
-use std::fmt::{Display, Formatter, Result};
+use std::fmt::{Display, Formatter};
 use std::{fmt, result};
 
 pub struct KVStorage<T> {

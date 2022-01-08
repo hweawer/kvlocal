@@ -19,9 +19,8 @@ pub fn run() {
         let args: Vec<&str> = input.trim().split(' ').collect();
         match args[0] {
             SET => storage.insert(args[1].to_string(), args[2].to_string()),
-            RM => match storage.delete(args[1]) {
-                Err(x) => println!("{}", x),
-                Ok(_) => (),
+            RM => if let Err(x) = storage.delete(args[1]) {
+                println!("{}", x)
             },
             GET => match storage.get(args[1]) {
                 Some(x) => println!("{}", x),
