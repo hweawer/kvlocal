@@ -16,19 +16,19 @@ pub fn run() {
             .read_line(&mut input)
             .expect("Failed to read command");
         input = input.trim().to_string();
-        let args: Vec<&str> = input.trim().split(" ").collect();
+        let args: Vec<&str> = input.trim().split(' ').collect();
         match args[0] {
             SET => storage.insert(args[1].to_string(), args[2].to_string()),
             RM => match storage.delete(args[1]) {
-                Err(x) => println!("{}",x),
-                Ok(_) => ()
+                Err(x) => println!("{}", x),
+                Ok(_) => (),
             },
             GET => match storage.get(args[1]) {
                 Some(x) => println!("{}", x),
-                None => println!("Key wasn't found")
+                None => eprintln!("Key wasn't found"),
             },
             EXIT => return,
-            x => println!("Unknown command {}", x)
+            x => eprintln!("Unknown command {}", x),
         }
         input.clear()
     }

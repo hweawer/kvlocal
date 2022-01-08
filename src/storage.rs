@@ -4,27 +4,26 @@ use std::fmt::{Display, Formatter, Result};
 use std::{fmt, result};
 
 pub struct KVStorage<T> {
-    store: HashMap<String, T>
+    store: HashMap<String, T>,
 }
 
 impl<T> KVStorage<T> {
     pub fn new() -> KVStorage<T> {
         KVStorage {
-            store: HashMap::new()
+            store: HashMap::new(),
         }
     }
 
     pub fn insert(&mut self, key: String, value: T) {
         self.store.insert(key, value);
-        ()
     }
 
     pub fn delete(&mut self, key: &str) -> result::Result<(), StorageError> {
         match self.store.remove(key) {
             Some(_) => result::Result::Ok(()),
-            None => result::Result::Err(
-                StorageError(String::from("You are trying to delete by key which is not present"))
-            )
+            None => result::Result::Err(StorageError(String::from(
+                "You are trying to delete by key which is not present",
+            ))),
         }
     }
 
