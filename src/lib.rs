@@ -1,4 +1,5 @@
 mod storage;
+mod log;
 
 use std::io;
 use storage::KVStorage;
