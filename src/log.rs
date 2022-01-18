@@ -1,22 +1,21 @@
 use std::fs::File;
 use serde::{Deserialize, Serialize};
 use anyhow::Result;
-use std::fs;
-use std::io::{BufWriter, Write};
+use std::io::{BufWriter, LineWriter, Write};
 
 const SET_NAME: &str = "SET";
 const RM_NAME: &str = "RM";
 
 pub enum Operation {
     SET(String, String),
-    RM(String, String)
+    RM(String)
 }
 
 impl Operation {
-    pub fn name(op: &Operation) -> &str {
+    pub fn name(op: &Operation) -> &'static str {
         match op {
             Operation::SET(_,_) => SET_NAME,
-            Operation::RM(_,_) => RM_NAME
+            Operation::RM(_) => RM_NAME
         }
     }
 }
@@ -25,37 +24,37 @@ impl Operation {
 pub struct LogRecord {
     op: &'static str,
     key: String,
-    value: String
+    value: Option<String>
 }
 
 impl LogRecord {
     pub fn from_operation(op: &Operation) -> LogRecord {
         match op {
-            Operation::SET(key, value) | Operation::RM(key, value) =>
-                LogRecord { op: Operation::name(op), key: String::from(key), value: String::from(value) }
+            Operation::SET(key, value) =>
+                LogRecord { op: Operation::name(op), key: String::from(key), value: Some(String::from(value)) },
+            Operation::RM(key) => LogRecord { op: Operation::name(op), key: String::from(key), value: None }
         }
     }
 }
 
 pub struct LogWriter {
-    file: File,
-    buf_writer: BufWriter<File>
+    buf_writer: LineWriter<File>
 }
 
 impl LogWriter {
-    pub fn new(path: String) -> Result<LogWriter> {
-        let file = File::open(path)?;
-        let buf = BufWriter::new(&file)?;
+    pub fn new(path: &str) -> Result<LogWriter> {
+        let file = File::create(path)?;
+        let buf = LineWriter::new(file);
         Ok(LogWriter {
-            file,
             buf_writer: buf
         })
     }
 
-    pub fn write(&self, op: &Operation) -> Result<()> {
+    pub fn write(&mut self, op: &Operation) -> Result<()> {
         let record = LogRecord::from_operation(op);
         let json = LogWriter::log_record(&record)?;
-        serde_json::to_writer(bw, &json)?;
+        self.buf_writer.write_all(json.as_bytes())?;
+        self.buf_writer.write_all(b"\n")?;
         Ok(())
     }
 

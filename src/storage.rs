@@ -1,33 +1,37 @@
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
-use std::{fmt, result};
+use std::fmt;
+use crate::log::{LogWriter, Operation};
+use anyhow::Result;
 
-pub struct KVStorage<T> {
-    store: HashMap<String, T>,
+pub struct KVStorage {
+    store: HashMap<String, String>,
+    log_writer: LogWriter
 }
 
-impl<T> KVStorage<T> {
-    pub fn new() -> KVStorage<T> {
-        KVStorage {
+impl KVStorage {
+    pub fn new() -> Result<KVStorage> {
+        let writer = LogWriter::new("log")?;
+        Ok(KVStorage {
             store: HashMap::new(),
-        }
+            log_writer: writer
+        })
     }
 
-    pub fn insert(&mut self, key: String, value: T) {
-        self.store.insert(key, value);
+    pub fn insert(&mut self, key: String, value: String) -> Result<()> {
+        self.store.insert(key.clone(), value.clone());
+        self.log_writer.write(&Operation::SET(key, value.clone()))?;
+        Ok(())
     }
 
-    pub fn delete(&mut self, key: &str) -> result::Result<(), StorageError> {
-        match self.store.remove(key) {
-            Some(_) => result::Result::Ok(()),
-            None => result::Result::Err(StorageError(String::from(
-                "You are trying to delete by key which is not present",
-            ))),
-        }
+    pub fn delete(&mut self, key: &str) -> Result<()> {
+        self.store.remove(key);
+        self.log_writer.write(&Operation::RM(key.to_string()))?;
+        Ok(())
     }
 
-    pub fn get(&self, key: &str) -> Option<&T> {
+    pub fn get(&self, key: &str) -> Option<&String> {
         self.store.get(key)
     }
 }
