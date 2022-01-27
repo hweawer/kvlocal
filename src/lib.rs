@@ -1,7 +1,9 @@
 mod storage;
 mod log;
+mod seek;
 
 use std::io;
+use std::path::PathBuf;
 use storage::KVStorage;
 use anyhow::Result;
 
@@ -12,7 +14,7 @@ const EXIT: &str = "exit";
 
 pub fn run() -> Result<()> {
     let mut input = String::new();
-    let mut storage: KVStorage = KVStorage::new()?;
+    let mut storage: KVStorage = KVStorage::new(PathBuf::new())?;
     loop {
         io::stdin()
             .read_line(&mut input)
