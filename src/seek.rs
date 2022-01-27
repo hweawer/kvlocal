@@ -1,5 +1,5 @@
-use std::io::{BufWriter, BufReader, Read, Seek, SeekFrom, Write};
 use anyhow::Result;
+use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 
 pub struct SeekReader<T: Read + Seek> {
     pos: u64,

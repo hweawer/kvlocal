@@ -1,11 +1,11 @@
-mod storage;
 mod log;
 mod seek;
+mod storage;
 
+use anyhow::Result;
 use std::io;
 use std::path::PathBuf;
 use storage::KVStorage;
-use anyhow::Result;
 
 const SET: &str = "set";
 const RM: &str = "rm";
@@ -23,9 +23,11 @@ pub fn run() -> Result<()> {
         let args: Vec<&str> = input.trim().split(' ').collect();
         match args[0] {
             SET => storage.insert(args[1].to_string(), args[2].to_string())?,
-            RM => if let Err(x) = storage.delete(args[1]) {
+            RM => {
+                if let Err(x) = storage.delete(args[1]) {
                     println!("{}", x)
-                },
+                }
+            }
             GET => match storage.get(args[1]) {
                 Some(x) => println!("{}", x),
                 None => eprintln!("Key wasn't found"),

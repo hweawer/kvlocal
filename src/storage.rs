@@ -1,17 +1,17 @@
+use crate::log::{LogRecord, LogWriter, Operation};
+use crate::seek::{SeekReader, SeekWriter};
+use anyhow::Result;
+use lazy_static::lazy_static;
+use regex::Regex;
 use std::collections::HashMap;
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
-use std::fmt::{Display, Formatter};
 use std::fmt;
-use std::fs::{create_dir_all, DirEntry, File, OpenOptions, read_dir};
+use std::fmt::{Display, Formatter};
+use std::fs::{create_dir_all, read_dir, DirEntry, File, OpenOptions};
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::ops::Add;
 use std::path::{Path, PathBuf};
-use crate::log::{LogRecord, LogWriter, Operation};
-use anyhow::Result;
-use regex::Regex;
-use lazy_static::lazy_static;
-use crate::seek::{SeekWriter, SeekReader};
 
 lazy_static! {
     static ref LOG_NAME_REGEX: Regex = Regex::new(r"\d+").unwrap();
@@ -42,8 +42,10 @@ impl From<&Generation> for LogName {
 
 impl LogName {
     fn is_log(path: impl Into<PathBuf> + Copy) -> bool {
-        let path = path.into()
-            .file_name().unwrap()
+        let path = path
+            .into()
+            .file_name()
+            .unwrap()
             .to_string_lossy()
             .to_string();
         LOG_NAME_REGEX.is_match(&path)
@@ -57,12 +59,18 @@ impl KVStorage {
         let mut readers: HashMap<Generation, SeekReader<File>> = HashMap::new();
         let index: HashMap<String, IndexValue> = HashMap::new();
         for &gen in &generations {
-            let mut reader: SeekReader<File> = SeekReader::new(File::open(path.join(LogName::from(&gen).0))?)?;
+            let mut reader: SeekReader<File> =
+                SeekReader::new(File::open(path.join(LogName::from(&gen).0))?)?;
             readers.insert(gen, reader);
         }
         let gen = generations.last().unwrap_or(&0) + 1;
         let writer = KVStorage::new_log_file(gen, &path, &mut readers)?;
-        Ok(KVStorage{index, writer, readers, store: HashMap::new()})
+        Ok(KVStorage {
+            index,
+            writer,
+            readers,
+            store: HashMap::new(),
+        })
     }
 
     pub fn insert(&mut self, key: String, value: String) -> Result<()> {
@@ -81,14 +89,18 @@ impl KVStorage {
         self.store.get(key)
     }
 
-    fn new_log_file(gen: Generation, dir: &Path, readers: &mut HashMap<Generation, SeekReader<File>>) -> Result<SeekWriter<File>> {
+    fn new_log_file(
+        gen: Generation,
+        dir: &Path,
+        readers: &mut HashMap<Generation, SeekReader<File>>,
+    ) -> Result<SeekWriter<File>> {
         let new_file_path = dir.join(LogName::from(&gen).0);
         let writer = SeekWriter::new(
             OpenOptions::new()
                 .create(true)
                 .write(true)
                 .append(true)
-                .open(&new_file_path)?
+                .open(&new_file_path)?,
         )?;
         let reader = SeekReader::new(File::open(&new_file_path)?)?;
         readers.insert(gen, reader);
@@ -100,8 +112,7 @@ impl KVStorage {
             .flat_map(|dir| dir.map(|dir| dir.path()))
             .filter(|path| LogName::is_log(path))
             .flat_map(|path| {
-                path
-                    .file_name()
+                path.file_name()
                     .and_then(|s| s.to_str())
                     .map(str::parse::<Generation>)
             })
@@ -114,8 +125,8 @@ impl KVStorage {
 
 #[cfg(test)]
 mod test {
-    use std::path::Path;
     use super::*;
+    use std::path::Path;
 
     #[test]
     fn test_from_log_name() {
