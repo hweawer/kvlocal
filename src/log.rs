@@ -6,6 +6,7 @@ use std::io::{BufWriter, LineWriter, Write};
 const SET_NAME: &str = "SET";
 const RM_NAME: &str = "RM";
 
+#[derive(Serialize, Deserialize)]
 pub enum Operation {
     SET(String, String),
     RM(String),
@@ -24,6 +25,7 @@ impl Operation {
 pub struct LogRecord {
     op: &'static str,
     key: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     value: Option<String>,
 }
 

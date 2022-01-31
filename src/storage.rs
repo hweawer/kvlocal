@@ -1,3 +1,4 @@
+use std::collections::btree_map::BTreeMap;
 use crate::log::{LogRecord, LogWriter, Operation};
 use crate::seek::{SeekReader, SeekWriter};
 use anyhow::Result;
@@ -12,6 +13,7 @@ use std::fs::{create_dir_all, read_dir, DirEntry, File, OpenOptions};
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::ops::Add;
 use std::path::{Path, PathBuf};
+use serde_json::Deserializer;
 
 lazy_static! {
     static ref LOG_NAME_REGEX: Regex = Regex::new(r"\d+").unwrap();
@@ -20,7 +22,7 @@ lazy_static! {
 type Generation = u64;
 
 pub struct KVStorage {
-    index: HashMap<String, IndexValue>,
+    index: BTreeMap<String, IndexValue>,
     writer: SeekWriter<File>,
     readers: HashMap<Generation, SeekReader<File>>,
     store: HashMap<String, String>,
@@ -57,7 +59,7 @@ impl KVStorage {
         create_dir_all(&path)?;
         let generations = KVStorage::sorted_generations(&path)?;
         let mut readers: HashMap<Generation, SeekReader<File>> = HashMap::new();
-        let index: HashMap<String, IndexValue> = HashMap::new();
+        let index: BTreeMap<String, IndexValue> = BTreeMap::new();
         for &gen in &generations {
             let mut reader: SeekReader<File> =
                 SeekReader::new(File::open(path.join(LogName::from(&gen).0))?)?;
@@ -120,6 +122,29 @@ impl KVStorage {
             .collect();
         generations.sort_unstable();
         Ok(generations)
+    }
+
+    fn load_log(gen: Generation, index: &mut BTreeMap<String, IndexValue>, reader: &mut SeekReader<File>) -> Result<()> {
+        // 1. Read record
+        // 2. If remove ->  remove from index. continue
+        // 3. Create IndexValue.
+        // 4. Insert by index key
+        let mut pos = reader.seek(SeekFrom::Start(0))?;
+        let mut stream = Deserializer::from_reader(reader).into_iter::<Operation>();
+        while let Some(record) = stream.next() {
+            let new_pos = stream.byte_offset() as u64;
+            match record? {
+                Operation::SET(key, _) => {
+                    let index_value = IndexValue {gen, offset: pos, len: new_pos - pos};
+                    index.insert(key, index_value).unwrap();
+                },
+                Operation::RM(key) => {
+                    index.remove(&key).unwrap();
+                }
+            }
+            pos = new_pos;
+        }
+        Ok(())
     }
 }
 
