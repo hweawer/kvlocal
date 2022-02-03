@@ -24,13 +24,14 @@ pub fn run() -> Result<()> {
         match args[0] {
             SET => storage.insert(args[1].to_string(), args[2].to_string())?,
             RM => {
-                if let Err(x) = storage.delete(args[1]) {
+                if let Err(x) = storage.delete(args[1].to_string()) {
                     println!("{}", x)
                 }
             }
-            GET => match storage.get(args[1]) {
-                Some(x) => println!("{}", x),
-                None => eprintln!("Key wasn't found"),
+            GET => match storage.get(args[1].to_string()) {
+                Ok(Some(x)) => println!("{}", x),
+                Ok(None) => eprintln!("Key wasn't found"),
+                Err(e) => eprintln!("{}", e),
             },
             EXIT => break,
             x => eprintln!("Unknown command {}", x),

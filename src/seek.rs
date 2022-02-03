@@ -30,7 +30,7 @@ impl<T: Read + Seek> Seek for SeekReader<T> {
 }
 
 pub struct SeekWriter<T: Write + Seek> {
-    pos: u64,
+    pub pos: u64,
     writer: BufWriter<T>,
 }
 

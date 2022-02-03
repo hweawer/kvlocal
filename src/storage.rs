@@ -1,9 +1,10 @@
-use std::collections::btree_map::BTreeMap;
 use crate::log::{LogRecord, LogWriter, Operation};
 use crate::seek::{SeekReader, SeekWriter};
 use anyhow::Result;
 use lazy_static::lazy_static;
 use regex::Regex;
+use serde_json::Deserializer;
+use std::collections::btree_map::BTreeMap;
 use std::collections::HashMap;
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
@@ -13,7 +14,7 @@ use std::fs::{create_dir_all, read_dir, DirEntry, File, OpenOptions};
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::ops::Add;
 use std::path::{Path, PathBuf};
-use serde_json::Deserializer;
+use std::string::String;
 
 lazy_static! {
     static ref LOG_NAME_REGEX: Regex = Regex::new(r"\d+").unwrap();
@@ -22,10 +23,10 @@ lazy_static! {
 type Generation = u64;
 
 pub struct KVStorage {
+    gen: Generation,
     index: BTreeMap<String, IndexValue>,
     writer: SeekWriter<File>,
     readers: HashMap<Generation, SeekReader<File>>,
-    store: HashMap<String, String>,
 }
 
 struct IndexValue {
@@ -59,36 +60,63 @@ impl KVStorage {
         create_dir_all(&path)?;
         let generations = KVStorage::sorted_generations(&path)?;
         let mut readers: HashMap<Generation, SeekReader<File>> = HashMap::new();
-        let index: BTreeMap<String, IndexValue> = BTreeMap::new();
+        let mut index: BTreeMap<String, IndexValue> = BTreeMap::new();
         for &gen in &generations {
             let mut reader: SeekReader<File> =
                 SeekReader::new(File::open(path.join(LogName::from(&gen).0))?)?;
+            KVStorage::load_log(gen, &mut index, &mut reader)?;
             readers.insert(gen, reader);
         }
         let gen = generations.last().unwrap_or(&0) + 1;
         let writer = KVStorage::new_log_file(gen, &path, &mut readers)?;
         Ok(KVStorage {
+            gen,
             index,
             writer,
             readers,
-            store: HashMap::new(),
         })
     }
 
     pub fn insert(&mut self, key: String, value: String) -> Result<()> {
-        self.store.insert(key.clone(), value.clone());
-        //self.writer.write(&Operation::SET(key, value.clone()))?;
+        let op = Operation::SET(key, value);
+        let pos = self.writer.pos;
+        serde_json::to_writer(&mut self.writer, &op)?;
+        &self.writer.flush();
+        let value = IndexValue {
+            gen: self.gen,
+            offset: pos,
+            len: &self.writer.pos - pos,
+        };
+        if let Operation::SET(key, ..) = op {
+            &self.index.insert(key, value);
+        }
         Ok(())
     }
 
-    pub fn delete(&mut self, key: &str) -> Result<()> {
-        self.store.remove(key);
-        //self.writer.write(&Operation::RM(key.to_string()))?;
+    pub fn delete(&mut self, key: String) -> Result<()> {
+        let op = Operation::RM(key);
+        serde_json::to_writer(&mut self.writer, &op)?;
+        &self.writer.flush();
+        if let Operation::RM(key) = op {
+            &self.index.remove(&key).unwrap();
+        }
         Ok(())
     }
 
-    pub fn get(&self, key: &str) -> Option<&String> {
-        self.store.get(key)
+    pub fn get(&mut self, key: String) -> Result<Option<String>> {
+        if self.index.contains_key(&key) {
+            let value = self.index.get(&key).unwrap();
+            let mut reader = self.readers.get_mut(&value.gen).unwrap();
+            reader.seek(SeekFrom::Start(value.offset))?;
+            let operation_border = reader.take(value.len);
+            if let Operation::SET(value, ..) = serde_json::from_reader(operation_border)? {
+                Ok(Some(value))
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(None)
+        }
     }
 
     fn new_log_file(
@@ -124,7 +152,11 @@ impl KVStorage {
         Ok(generations)
     }
 
-    fn load_log(gen: Generation, index: &mut BTreeMap<String, IndexValue>, reader: &mut SeekReader<File>) -> Result<()> {
+    fn load_log(
+        gen: Generation,
+        index: &mut BTreeMap<String, IndexValue>,
+        reader: &mut SeekReader<File>,
+    ) -> Result<()> {
         // 1. Read record
         // 2. If remove ->  remove from index. continue
         // 3. Create IndexValue.
@@ -135,9 +167,13 @@ impl KVStorage {
             let new_pos = stream.byte_offset() as u64;
             match record? {
                 Operation::SET(key, _) => {
-                    let index_value = IndexValue {gen, offset: pos, len: new_pos - pos};
+                    let index_value = IndexValue {
+                        gen,
+                        offset: pos,
+                        len: new_pos - pos,
+                    };
                     index.insert(key, index_value).unwrap();
-                },
+                }
                 Operation::RM(key) => {
                     index.remove(&key).unwrap();
                 }
