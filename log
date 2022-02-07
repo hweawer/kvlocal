@@ -1,3 +1,0 @@
-{"op":"SET","key":"1","value":"12"}
-{"op":"SET","key":"5","value":"14"}
-{"op":"RM","key":"1","value":null}

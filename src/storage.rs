@@ -12,12 +12,13 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::fs::{create_dir_all, read_dir, DirEntry, File, OpenOptions};
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
+use std::num::ParseIntError;
 use std::ops::Add;
 use std::path::{Path, PathBuf};
 use std::string::String;
 
 lazy_static! {
-    static ref LOG_NAME_REGEX: Regex = Regex::new(r"\d+").unwrap();
+    static ref LOG_NAME_REGEX: Regex = Regex::new(r"\d+.log").unwrap();
 }
 
 type Generation = u64;
@@ -109,8 +110,8 @@ impl KVStorage {
             let mut reader = self.readers.get_mut(&value.gen).unwrap();
             reader.seek(SeekFrom::Start(value.offset))?;
             let operation_border = reader.take(value.len);
-            if let Operation::SET(value, ..) = serde_json::from_reader(operation_border)? {
-                Ok(Some(value))
+            if let Operation::SET(_key, val) = serde_json::from_reader(operation_border)? {
+                Ok(Some(val))
             } else {
                 Ok(None)
             }
@@ -143,11 +144,12 @@ impl KVStorage {
             .filter(|path| LogName::is_log(path))
             .flat_map(|path| {
                 path.file_name()
-                    .and_then(|s| s.to_str())
+                    .and_then(|s| {
+                        s.to_str().map(|x| x.trim_end_matches(".log"))
+                    })
                     .map(str::parse::<Generation>)
             })
-            .flatten()
-            .collect();
+            .collect::<Result<Vec<Generation>, ParseIntError>>()?;
         generations.sort_unstable();
         Ok(generations)
     }
@@ -172,10 +174,10 @@ impl KVStorage {
                         offset: pos,
                         len: new_pos - pos,
                     };
-                    index.insert(key, index_value).unwrap();
+                    index.insert(key, index_value);
                 }
                 Operation::RM(key) => {
-                    index.remove(&key).unwrap();
+                    index.remove(&key);
                 }
             }
             pos = new_pos;

@@ -12,9 +12,9 @@ const RM: &str = "rm";
 const GET: &str = "get";
 const EXIT: &str = "exit";
 
-pub fn run() -> Result<()> {
+pub fn run(path: PathBuf) -> Result<()> {
     let mut input = String::new();
-    let mut storage: KVStorage = KVStorage::new(PathBuf::new())?;
+    let mut storage: KVStorage = KVStorage::new(path)?;
     loop {
         io::stdin()
             .read_line(&mut input)
