@@ -1,4 +1,4 @@
-use crate::log::{LogRecord, LogWriter, Operation};
+use crate::log::Operation;
 use crate::seek::{SeekReader, SeekWriter};
 use anyhow::Result;
 use lazy_static::lazy_static;
@@ -6,12 +6,8 @@ use regex::Regex;
 use serde_json::Deserializer;
 use std::collections::btree_map::BTreeMap;
 use std::collections::HashMap;
-use std::error::Error;
-use std::ffi::{OsStr, OsString};
-use std::fmt;
-use std::fmt::{Display, Formatter};
-use std::fs::{create_dir_all, read_dir, DirEntry, File, OpenOptions};
-use std::io::{BufReader, Read, Seek, SeekFrom, Write};
+use std::fs::{create_dir_all, read_dir, File, OpenOptions};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::num::ParseIntError;
 use std::ops::Add;
 use std::path::{Path, PathBuf};
@@ -79,27 +75,27 @@ impl KVStorage {
     }
 
     pub fn insert(&mut self, key: String, value: String) -> Result<()> {
-        let op = Operation::SET(key, value);
+        let op = Operation::Set(key, value);
         let pos = self.writer.pos;
         serde_json::to_writer(&mut self.writer, &op)?;
-        &self.writer.flush();
+        self.writer.flush()?;
         let value = IndexValue {
             gen: self.gen,
             offset: pos,
-            len: &self.writer.pos - pos,
+            len: self.writer.pos - pos,
         };
-        if let Operation::SET(key, ..) = op {
-            &self.index.insert(key, value);
+        if let Operation::Set(key, ..) = op {
+            self.index.insert(key, value);
         }
         Ok(())
     }
 
     pub fn delete(&mut self, key: String) -> Result<()> {
-        let op = Operation::RM(key);
+        let op = Operation::Rm(key);
         serde_json::to_writer(&mut self.writer, &op)?;
-        &self.writer.flush();
-        if let Operation::RM(key) = op {
-            &self.index.remove(&key).unwrap();
+        let _ = &self.writer.flush();
+        if let Operation::Rm(key) = op {
+            let _ = &self.index.remove(&key);
         }
         Ok(())
     }
@@ -107,10 +103,10 @@ impl KVStorage {
     pub fn get(&mut self, key: String) -> Result<Option<String>> {
         if self.index.contains_key(&key) {
             let value = self.index.get(&key).unwrap();
-            let mut reader = self.readers.get_mut(&value.gen).unwrap();
+            let reader = self.readers.get_mut(&value.gen).unwrap();
             reader.seek(SeekFrom::Start(value.offset))?;
             let operation_border = reader.take(value.len);
-            if let Operation::SET(_key, val) = serde_json::from_reader(operation_border)? {
+            if let Operation::Set(_key, val) = serde_json::from_reader(operation_border)? {
                 Ok(Some(val))
             } else {
                 Ok(None)
@@ -138,15 +134,13 @@ impl KVStorage {
         Ok(writer)
     }
 
-    fn sorted_generations(path: &PathBuf) -> Result<Vec<Generation>> {
+    fn sorted_generations(path: &Path) -> Result<Vec<Generation>> {
         let mut generations: Vec<Generation> = read_dir(path)?
             .flat_map(|dir| dir.map(|dir| dir.path()))
             .filter(|path| LogName::is_log(path))
             .flat_map(|path| {
                 path.file_name()
-                    .and_then(|s| {
-                        s.to_str().map(|x| x.trim_end_matches(".log"))
-                    })
+                    .and_then(|s| s.to_str().map(|x| x.trim_end_matches(".log")))
                     .map(str::parse::<Generation>)
             })
             .collect::<Result<Vec<Generation>, ParseIntError>>()?;
@@ -168,7 +162,7 @@ impl KVStorage {
         while let Some(record) = stream.next() {
             let new_pos = stream.byte_offset() as u64;
             match record? {
-                Operation::SET(key, _) => {
+                Operation::Set(key, _) => {
                     let index_value = IndexValue {
                         gen,
                         offset: pos,
@@ -176,7 +170,7 @@ impl KVStorage {
                     };
                     index.insert(key, index_value);
                 }
-                Operation::RM(key) => {
+                Operation::Rm(key) => {
                     index.remove(&key);
                 }
             }
