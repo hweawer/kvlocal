@@ -53,9 +53,10 @@ impl LogName {
 }
 
 impl KVStorage {
-    pub fn new(path: PathBuf) -> Result<KVStorage> {
-        create_dir_all(&path)?;
-        let generations = KVStorage::sorted_generations(&path)?;
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<KVStorage> {
+        let path = path.as_ref();
+        create_dir_all(path)?;
+        let generations = KVStorage::sorted_generations(path)?;
         let mut readers: HashMap<Generation, SeekReader<File>> = HashMap::new();
         let mut index: BTreeMap<String, IndexValue> = BTreeMap::new();
         for &gen in &generations {
@@ -65,7 +66,7 @@ impl KVStorage {
             readers.insert(gen, reader);
         }
         let gen = generations.last().unwrap_or(&0) + 1;
-        let writer = KVStorage::new_log_file(gen, &path, &mut readers)?;
+        let writer = KVStorage::new_log_file(gen, path, &mut readers)?;
         Ok(KVStorage {
             gen,
             index,

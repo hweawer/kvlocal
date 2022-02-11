@@ -4,7 +4,7 @@ mod storage;
 
 use anyhow::Result;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use storage::KVStorage;
 
 const SET: &str = "set";
@@ -12,7 +12,7 @@ const RM: &str = "rm";
 const GET: &str = "get";
 const EXIT: &str = "exit";
 
-pub fn run(path: PathBuf) -> Result<()> {
+pub fn run<P: AsRef<Path>>(path: P) -> Result<()> {
     let mut input = String::new();
     let mut storage: KVStorage = KVStorage::new(path)?;
     loop {
