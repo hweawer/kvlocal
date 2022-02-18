@@ -12,6 +12,7 @@ use std::num::ParseIntError;
 use std::ops::Add;
 use std::path::{Path, PathBuf};
 use std::string::String;
+use crate::storage::StorageEngine;
 
 lazy_static! {
     static ref LOG_NAME_REGEX: Regex = Regex::new(r"\d+.log").unwrap();
@@ -75,48 +76,6 @@ impl KVStorage {
         })
     }
 
-    pub fn insert(&mut self, key: String, value: String) -> Result<()> {
-        let op = Operation::Set(key, value);
-        let pos = self.writer.pos;
-        serde_json::to_writer(&mut self.writer, &op)?;
-        self.writer.flush()?;
-        let value = IndexValue {
-            gen: self.gen,
-            offset: pos,
-            len: self.writer.pos - pos,
-        };
-        if let Operation::Set(key, ..) = op {
-            self.index.insert(key, value);
-        }
-        Ok(())
-    }
-
-    pub fn delete(&mut self, key: String) -> Result<()> {
-        let op = Operation::Rm(key);
-        serde_json::to_writer(&mut self.writer, &op)?;
-        let _ = &self.writer.flush();
-        if let Operation::Rm(key) = op {
-            let _ = &self.index.remove(&key);
-        }
-        Ok(())
-    }
-
-    pub fn get(&mut self, key: String) -> Result<Option<String>> {
-        if self.index.contains_key(&key) {
-            let value = self.index.get(&key).unwrap();
-            let reader = self.readers.get_mut(&value.gen).unwrap();
-            reader.seek(SeekFrom::Start(value.offset))?;
-            let operation_border = reader.take(value.len);
-            if let Operation::Set(_key, val) = serde_json::from_reader(operation_border)? {
-                Ok(Some(val))
-            } else {
-                Ok(None)
-            }
-        } else {
-            Ok(None)
-        }
-    }
-
     fn new_log_file(
         gen: Generation,
         dir: &Path,
@@ -176,6 +135,50 @@ impl KVStorage {
                 }
             }
             pos = new_pos;
+        }
+        Ok(())
+    }
+}
+
+impl StorageEngine for KVStorage {
+    fn get(&mut self, key: String) -> Result<Option<String>> {
+        if self.index.contains_key(&key) {
+            let value = self.index.get(&key).unwrap();
+            let reader = self.readers.get_mut(&value.gen).unwrap();
+            reader.seek(SeekFrom::Start(value.offset))?;
+            let operation_border = reader.take(value.len);
+            if let Operation::Set(_key, val) = serde_json::from_reader(operation_border)? {
+                Ok(Some(val))
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn remove(&mut self, key: String) -> Result<()> {
+        let op = Operation::Rm(key);
+        serde_json::to_writer(&mut self.writer, &op)?;
+        let _ = &self.writer.flush();
+        if let Operation::Rm(key) = op {
+            let _ = &self.index.remove(&key);
+        }
+        Ok(())
+    }
+
+    fn set(&mut self, key: String, value: String) -> Result<()> {
+        let op = Operation::Set(key, value);
+        let pos = self.writer.pos;
+        serde_json::to_writer(&mut self.writer, &op)?;
+        self.writer.flush()?;
+        let value = IndexValue {
+            gen: self.gen,
+            offset: pos,
+            len: self.writer.pos - pos,
+        };
+        if let Operation::Set(key, ..) = op {
+            self.index.insert(key, value);
         }
         Ok(())
     }

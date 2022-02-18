@@ -1,11 +1,13 @@
 mod log;
 mod seek;
 mod storage;
+mod protocol;
+mod server;
 
 use anyhow::Result;
 use std::io;
 use std::path::{Path, PathBuf};
-use storage::KVStorage;
+use storage::kvlocal::KVStorage;
 
 const SET: &str = "set";
 const RM: &str = "rm";
@@ -15,7 +17,7 @@ const EXIT: &str = "exit";
 pub fn run<P: AsRef<Path>>(path: P) -> Result<()> {
     let mut input = String::new();
     let mut storage: KVStorage = KVStorage::new(path)?;
-    loop {
+    /*loop {
         io::stdin()
             .read_line(&mut input)
             .expect("Failed to read command");
@@ -37,6 +39,6 @@ pub fn run<P: AsRef<Path>>(path: P) -> Result<()> {
             x => eprintln!("Unknown command {}", x),
         }
         input.clear();
-    }
+    }*/
     Ok(())
 }
