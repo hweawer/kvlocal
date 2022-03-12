@@ -5,7 +5,7 @@ use anyhow::Result;
 struct SledStorage(Db);
 
 impl StorageEngine for SledStorage {
-    fn get(&mut self, k: String) -> anyhow::Result<Option<String>> {
+    fn get(&mut self, k: String) -> Result<Option<String>> {
         let s = &self.0;
         Ok(s
             .get(k)?
@@ -14,13 +14,13 @@ impl StorageEngine for SledStorage {
             .transpose()?)
     }
 
-    fn remove(&mut self, k: String) -> anyhow::Result<()> {
+    fn remove(&mut self, k: String) -> Result<()> {
         let s = &self.0;
         s.remove(k)?;
         Ok(())
     }
 
-    fn set(&mut self, k: String, v: String) -> anyhow::Result<()> {
+    fn set(&mut self, k: String, v: String) -> Result<()> {
         let s = &self.0;
         s.insert(k, v.into_bytes())?;
         Ok(())
