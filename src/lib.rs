@@ -1,12 +1,12 @@
 mod log;
-mod seek;
-mod storage;
 mod protocol;
+mod seek;
 mod server;
+mod storage;
 
 use anyhow::Result;
-use std::io;
-use std::path::{Path, PathBuf};
+
+use std::path::Path;
 use storage::kvlocal::KVStorage;
 
 const SET: &str = "set";
@@ -15,8 +15,8 @@ const GET: &str = "get";
 const EXIT: &str = "exit";
 
 pub fn run<P: AsRef<Path>>(path: P) -> Result<()> {
-    let mut input = String::new();
-    let mut storage: KVStorage = KVStorage::new(path)?;
+    let _input = String::new();
+    let _storage: KVStorage = KVStorage::new(path)?;
     /*loop {
         io::stdin()
             .read_line(&mut input)

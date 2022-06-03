@@ -1,10 +1,10 @@
+use crate::protocol;
+use crate::protocol::Request;
+use crate::storage::StorageEngine;
+use anyhow::Result;
+use serde_json::Deserializer;
 use std::io::{BufReader, BufWriter, Write};
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
-use serde_json::Deserializer;
-use crate::protocol::Request;
-use anyhow::Result;
-use crate::protocol;
-use crate::storage::StorageEngine;
 
 pub struct Server<T: StorageEngine> {
     engine: T,
@@ -41,7 +41,7 @@ impl<T: StorageEngine> Server<T> {
                         let resp = protocol::GetResponse::Err(format!("{}", e));
                         serde_json::to_writer(&mut writer, &resp)?
                     }
-                }
+                },
                 Request::Rm { key } => match self.engine.remove(key) {
                     Ok(()) => {
                         let resp = protocol::RmResponse::Ok(());
@@ -51,7 +51,7 @@ impl<T: StorageEngine> Server<T> {
                         let resp = protocol::GetResponse::Err(format!("{}", e));
                         serde_json::to_writer(&mut writer, &resp)?
                     }
-                }
+                },
                 Request::Set { key, value } => match self.engine.set(key, value) {
                     Ok(()) => {
                         let resp = protocol::SetResponse::Ok(());
@@ -61,11 +61,10 @@ impl<T: StorageEngine> Server<T> {
                         let resp = protocol::GetResponse::Err(format!("{}", e));
                         serde_json::to_writer(&mut writer, &resp)?
                     }
-                }
+                },
             };
             writer.flush()?
         }
         Ok(())
     }
 }
-

@@ -1,22 +1,18 @@
-use anyhow::Result;
-use std::{env, fs};
-use std::env::current_dir;
-use std::io::{BufReader, BufWriter};
-use std::net::{SocketAddr, TcpListener};
-use std::path::PathBuf;
-use serde::Deserialize;
-use serde_json::Deserializer;
-use structopt::clap::arg_enum;
-use structopt::StructOpt;
-use log::{debug, error, log_enabled, info, Level, LevelFilter};
+use anyhow::{anyhow, Result};
+use log::{info, LevelFilter};
+use std::env;
+use std::fmt::{Display, Formatter, write};
+use std::net::SocketAddr;
+use std::str::FromStr;
+use clap::StructOpt;
 
 const DEFAULT_LISTENING_ADDRESS: &str = "127.0.0.1:4000";
 const DEFAULT_ENGINE: Engine = Engine::kvs;
 
-#[derive(StructOpt, Debug)]
-#[structopt(name = "kvlocal")]
+#[derive(clap::Parser, Debug)]
+#[clap(name = "kvlocal")]
 struct Opt {
-    #[structopt(
+    #[clap(
     long,
     help = "Sets the listening address",
     value_name = "IP:PORT",
@@ -24,27 +20,46 @@ struct Opt {
     parse(try_from_str)
     )]
     addr: SocketAddr,
-    #[structopt(
+    #[clap(
     long,
     help = "Sets the storage engine",
     value_name = "ENGINE-NAME",
-    possible_values = & Engine::variants()
+    possible_values = ["kvs", "sled"]
     )]
     engine: Option<Engine>,
 }
 
-arg_enum! {
     #[allow(non_camel_case_types)]
-    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+    #[derive(clap::ArgEnum, Debug, Copy, Clone, PartialEq, Eq)]
     enum Engine {
         kvs,
         sled
+    }
+
+impl Display for Engine {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            Engine::kvs => write!(f, "kvs"),
+            Engine::sled => write!(f, "sled")
+        }
+    }
+}
+
+impl FromStr for Engine {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "kvs" => Ok(Engine::kvs),
+            "sled" => Ok(Engine::sled),
+            a => Err(anyhow!("Unknown engine type: {}", a))
+        }
     }
 }
 
 fn main() -> Result<()> {
     env_logger::builder().filter_level(LevelFilter::Info).init();
-    let mut opt = Opt::from_args();
+    let opt = Opt::parse();
     run(opt)
 }
 

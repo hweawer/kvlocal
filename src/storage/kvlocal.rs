@@ -1,5 +1,6 @@
 use crate::log::Operation;
 use crate::seek::{SeekReader, SeekWriter};
+use crate::storage::StorageEngine;
 use anyhow::Result;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -12,7 +13,6 @@ use std::num::ParseIntError;
 use std::ops::Add;
 use std::path::{Path, PathBuf};
 use std::string::String;
-use crate::storage::StorageEngine;
 
 lazy_static! {
     static ref LOG_NAME_REGEX: Regex = Regex::new(r"\d+.log").unwrap();
